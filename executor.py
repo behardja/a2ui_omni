@@ -83,36 +83,34 @@ def _loads_lenient(text: str):
         return json5.loads(text)
 
 
-A2UI_MSG_KEYS = ("createSurface", "updateComponents", "updateDataModel", "deleteSurface")
+A2UI_MSG_KEYS = ("beginRendering", "surfaceUpdate", "dataModelUpdate", "deleteSurface")
 
 
 def _expand_a2ui(payload):
-    """Yield individual single-key A2UI (v0.9) messages.
+    """Yield individual single-key A2UI (v0.8) messages.
 
-    Accepts a list of messages, a single message, or — a common LLM mistake —
-    one object that merges several messages (e.g.
-    {"createSurface": ..., "updateComponents": ..., "updateDataModel": ...}).
-    A2UI requires one message per object, so the merged form is split back into
-    separate messages (preserving canonical order); otherwise the renderer
-    rejects it and nothing draws. A `version` key alongside a message key is
-    preserved on each split message.
+    A v0.8 payload is a bare JSON array of messages, each containing exactly ONE
+    of the action keys (beginRendering / surfaceUpdate / dataModelUpdate /
+    deleteSurface) and no version field. Accepts a list, a single message, or —
+    a common LLM mistake — one object that merges several messages (e.g.
+    {"beginRendering": ..., "surfaceUpdate": ...}); the merged form is split
+    back into separate messages (preserving canonical order), otherwise the
+    renderer rejects it and nothing draws. Stray extra keys next to an action
+    key (e.g. a v0.9-habit "version") are dropped — v0.8 messages allow no
+    additional properties.
     """
     items = payload if isinstance(payload, list) else [payload]
     for item in items:
         if isinstance(item, dict):
-            # Unwrap a gallery-style envelope {name, description, messages:[...]}
-            # (the few-shot examples use it, so the LLM sometimes echoes it).
-            if isinstance(item.get("messages"), list):
-                yield from _expand_a2ui(item["messages"])
-                continue
             present = [k for k in A2UI_MSG_KEYS if k in item]
-            if len(present) > 1:
-                version = item.get("version")
+            if present and len(item) > len(present):
+                # Strip anything that isn't an action key (version, name, …).
                 for k in present:
-                    msg = {k: item[k]}
-                    if version is not None:
-                        msg["version"] = version
-                    yield msg
+                    yield {k: item[k]}
+                continue
+            if len(present) > 1:
+                for k in present:
+                    yield {k: item[k]}
                 continue
         yield item
 
@@ -146,12 +144,28 @@ def parse_response_to_parts(content: str) -> List[Part]:
     return parts
 
 
+def _unwrap_value(v):
+    """Unwrap a v0.8 value-object to its scalar.
+
+    Action context values may arrive as v0.8 value objects
+    ({"literalString": "x"} / {"literalNumber": 3} / {"literalBoolean": true})
+    or already resolved to plain scalars (renderers resolve {"path": ...}
+    bindings before dispatching the action). Handle both.
+    """
+    if isinstance(v, dict):
+        for k in ("literalString", "literalNumber", "literalBoolean"):
+            if k in v:
+                return v[k]
+    return v
+
+
 def _query_from_user_action(action: dict) -> str:
     """Map an inbound A2UI userAction into a natural-language query."""
     name = action.get("name")
     ctx = action.get("context", {}) or {}
-    if isinstance(ctx, list):  # context may arrive as a list of {key,value}
-        ctx = {c.get("key"): c.get("value") for c in ctx}
+    if isinstance(ctx, list):  # v0.8 context is a list of {key, value}
+        ctx = {c.get("key"): c.get("value") for c in ctx if isinstance(c, dict)}
+    ctx = {k: _unwrap_value(v) for k, v in ctx.items()}
     # Both the grid's "select_reference" and the settings panel's "run_eval"
     # kick off an evaluation and honor optional threshold/max_retries/prompt
     # (the dev client injects the config-rail values into the action context).
@@ -182,6 +196,17 @@ class ProductFidelityExecutor(AgentExecutor):
 
     def _init_agent(self):
         if self.agent is None:
+            # Force model calls onto the global endpoint. The orchestrator model
+            # (gemini-3.5-flash) is global-only, but Agent Engine's A2aAgent
+            # template stomps GOOGLE_CLOUD_LOCATION with the engine's region
+            # (us-central1) during set_up() — which runs after our module
+            # import. _init_agent runs at the first request, after set_up, so
+            # setting it here wins; ADK's genai client reads the env at the
+            # first LLM call. Gecko eval stays regional via the LOCATION var.
+            import os
+            os.environ["GOOGLE_CLOUD_LOCATION"] = os.environ.get(
+                "MODEL_LOCATION", "global"
+            )
             self.agent = get_agent()
             self.runner = Runner(
                 app_name=APP_NAME,

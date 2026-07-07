@@ -2,7 +2,9 @@
 
 This repository demonstrates the [product-fidelity-eval](https://github.com/behardja/product-fidelity-eval) framework fronted by **A2UI**, a declarative UI protocol that lets an agent return interactive widgets instead of plain text. A user browses a product reference image from Cloud Storage (or uploads one), optionally adds a line of creative direction, and the agent runs the Gecko fidelity-eval loop and renders the results — reference vs. candidate images, pass/fail status, scores, and rubric verdicts — as A2UI cards the browser draws directly.
 
-The same eval engine as `product-fidelity-eval` (describe → generate → Gecko score → threshold → retry) drives the loop; the difference here is the presentation layer: the agent emits **A2UI v0.9** over **A2A**, so it can drop into Gemini Enterprise, and a small local renderer lets you develop against it visually.
+The same eval engine as `product-fidelity-eval` (describe → generate → Gecko score → threshold → retry) drives the loop; the difference here is the presentation layer: the agent emits **A2UI v0.8** over **A2A**, matching Gemini Enterprise's built-in renderer (GE currently supports A2UI v0.8 only).
+
+> **Branches:** this branch targets **Gemini Enterprise (A2UI v0.8)** — GE's own renderer draws the UI, and GE currently supports v0.8 only. The **A2UI v0.9** implementation — including the local `dev_client` renderer for visual development — lives on the `v0.9_a2ui` branch, ready for when GE adds v0.9 support at GA. On this v0.8 branch the bundled `dev_client` (a v0.9 renderer) will *not* render the agent's v0.8 output; the render target here is the GE app.
 
 ## How it works
 
@@ -76,26 +78,45 @@ python server.py
 | Path | Role |
 |------|------|
 | `server.py` | single launcher: agent A2A server + renderer, prints a clickable URL |
-| `agent.py` | ADK agent; A2UI-aware system prompt (`A2uiSchemaManager` + few-shot `examples/0.9`) |
+| `agent.py` | ADK agent; A2UI-aware system prompt (`A2uiSchemaManager` + few-shot `examples/0.8`) |
 | `tools.py` | `list_gcs_images`, `ingest_uploaded_image_tool`, `get_eval_defaults`, `run_fidelity_eval` |
 | `generate.py` | `generate_candidate_image` — the eval loop's generation plugin (recontextualize → GCS) |
 | `executor.py` | A2A bridge: extracts `<a2ui-json>` → A2UI DataParts; maps `select_reference` / `run_eval` actions |
-| `examples/0.9/` | few-shot A2UI exemplars: `gcs_browser`, `fidelity_result`, `settings_panel` |
+| `examples/0.8/` | few-shot A2UI exemplars: `gcs_browser`, `fidelity_result`, `settings_panel` |
 | `evaluation_wrapper/` | vendored Gecko loop (`EvalPipeline` / `EvalConfig`) |
-| `dev_client/` | A2UI v0.9 renderer (built on `@a2ui/lit`) for local visual development |
+| `dev_client/` | A2UI **v0.9** renderer (built on `@a2ui/lit`) — renders on the `v0.9_a2ui` branch only; GE's own renderer draws the v0.8 output of this branch |
 | `adk_app.py` | `adk web` / Agent Engine entry point |
 | `__main__.py` | agent A2A server (`python -m a2ui_omni`, port 10002) |
-| `deploy.py` | **DEFERRED** — Agent Engine + Gemini Enterprise registration |
+| `deploy.py` | deploy to Agent Engine (runs as compute SA for signed URLs) + register on Gemini Enterprise with the A2UI extension & authorization |
+| `GE_AUTHORIZATION_SETUP.md` | one-time GE OAuth **Authorization Resource** setup (required for GE to invoke the agent) |
 
-## Deploy (later)
+## Deploy to Agent Engine + Gemini Enterprise
 
-Deployment to Agent Engine + Gemini Enterprise is intentionally deferred. When ready, set the deployment vars in `.env` and run `python deploy.py`.
+Set the deployment vars in `.env` and run `python deploy.py` (deploys to Vertex AI
+Agent Engine and, when `GEMINI_ENTERPRISE_APP_ID` is set, registers the agent on
+your Gemini Enterprise app).
+
+**Prerequisites for Gemini Enterprise rendering** (beyond the runtime requirements
+above) — the agent will deploy fine without these, but GE won't invoke or render it:
+
+- **A GE Authorization Resource (OAuth) is required.** A "Custom agent via A2A"
+  registration must have an `authorizationConfig.agentAuthorization` or GE blocks
+  invocation entirely (chat shows "Something went wrong" and no request reaches the
+  agent). This means: an OAuth 2.0 client + a Discovery Engine authorization
+  resource, attached to the registration. See **`GE_AUTHORIZATION_SETUP.md`** for
+  the one-time setup.
+- **Signed-URL permission for images.** The deployed runtime SA must be able to
+  mint V4 signed GCS URLs (`roles/iam.serviceAccountTokenCreator` on itself); the
+  agent runs as the compute SA for this (`deploy.py` sets `service_account`).
+- **A2UI version:** GE currently renders **v0.8** only (this branch targets it);
+  see the note at the top.
 
 ## Future Work
 
-- Deploy to Agent Engine + register with Gemini Enterprise.
+- Surface the settings panel (creative direction, threshold, attempts) natively in the GE flow, since GE has no local shell.
 - Add video generation/evaluation (Veo), as in `product-fidelity-eval`.
 - Add a lifecycle rule or cleanup for accumulated candidate images in the GCS bucket.
+- Adopt A2UI v0.9 for GE once GE GA supports it (merge from `v0.9_a2ui`).
 
 ## Reference
 

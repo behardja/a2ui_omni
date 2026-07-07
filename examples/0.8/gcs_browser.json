@@ -1,0 +1,134 @@
+[
+  {
+    "beginRendering": {
+      "surfaceId": "gcs-browser",
+      "catalogId": "https://a2ui.org/specification/v0_8/standard_catalog_definition.json",
+      "root": "root",
+      "styles": {
+        "primaryColor": "#135bec"
+      }
+    }
+  },
+  {
+    "surfaceUpdate": {
+      "surfaceId": "gcs-browser",
+      "components": [
+        {
+          "id": "root",
+          "component": {
+            "Column": {
+              "children": { "explicitList": ["title", "image-list"] },
+              "alignment": "stretch"
+            }
+          }
+        },
+        {
+          "id": "title",
+          "component": {
+            "Text": {
+              "text": { "literalString": "Select a reference image" },
+              "usageHint": "h2"
+            }
+          }
+        },
+        {
+          "id": "image-list",
+          "component": {
+            "List": {
+              "direction": "vertical",
+              "children": {
+                "template": {
+                  "componentId": "image-card",
+                  "dataBinding": "/images"
+                }
+              }
+            }
+          }
+        },
+        {
+          "id": "image-card",
+          "component": { "Card": { "child": "card-row" } }
+        },
+        {
+          "id": "card-row",
+          "component": {
+            "Row": {
+              "children": { "explicitList": ["thumb", "card-name", "select-btn"] },
+              "alignment": "center"
+            }
+          }
+        },
+        {
+          "id": "thumb",
+          "component": {
+            "Image": {
+              "url": { "path": "/url" },
+              "fit": "cover",
+              "usageHint": "smallFeature"
+            }
+          }
+        },
+        {
+          "id": "card-name",
+          "component": {
+            "Text": {
+              "text": { "path": "/name" },
+              "usageHint": "h4"
+            }
+          }
+        },
+        {
+          "id": "select-btn-label",
+          "component": {
+            "Text": { "text": { "literalString": "Generate and Evaluate" } }
+          }
+        },
+        {
+          "id": "select-btn",
+          "component": {
+            "Button": {
+              "child": "select-btn-label",
+              "primary": true,
+              "action": {
+                "name": "select_reference",
+                "context": [
+                  { "key": "referenceUri", "value": { "path": "/gs_uri" } },
+                  { "key": "name", "value": { "path": "/name" } }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "dataModelUpdate": {
+      "surfaceId": "gcs-browser",
+      "path": "/",
+      "contents": [
+        {
+          "key": "images",
+          "valueMap": [
+            {
+              "key": "image1",
+              "valueMap": [
+                { "key": "name", "valueString": "sneaker_front.png" },
+                { "key": "gs_uri", "valueString": "gs://my-bucket/products/sneaker_front.png" },
+                { "key": "url", "valueString": "https://storage.example.com/signed/sneaker_front.png" }
+              ]
+            },
+            {
+              "key": "image2",
+              "valueMap": [
+                { "key": "name", "valueString": "sneaker_side.png" },
+                { "key": "gs_uri", "valueString": "gs://my-bucket/products/sneaker_side.png" },
+                { "key": "url", "valueString": "https://storage.example.com/signed/sneaker_side.png" }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+]

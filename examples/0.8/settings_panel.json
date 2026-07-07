@@ -1,0 +1,122 @@
+[
+  {
+    "beginRendering": {
+      "surfaceId": "eval-settings",
+      "catalogId": "https://a2ui.org/specification/v0_8/standard_catalog_definition.json",
+      "root": "root",
+      "styles": {
+        "primaryColor": "#135bec"
+      }
+    }
+  },
+  {
+    "surfaceUpdate": {
+      "surfaceId": "eval-settings",
+      "components": [
+        { "id": "root", "component": { "Card": { "child": "col" } } },
+        {
+          "id": "col",
+          "component": {
+            "Column": {
+              "children": {
+                "explicitList": ["title", "sub", "ref", "thr", "ret", "prompt", "run"]
+              },
+              "alignment": "stretch"
+            }
+          }
+        },
+        {
+          "id": "title",
+          "component": {
+            "Text": { "text": { "literalString": "Evaluation settings" }, "usageHint": "h2" }
+          }
+        },
+        {
+          "id": "sub",
+          "component": {
+            "Text": {
+              "text": { "literalString": "Adjust these, then run. Defaults come from the server config." },
+              "usageHint": "caption"
+            }
+          }
+        },
+        {
+          "id": "ref",
+          "component": {
+            "TextField": {
+              "label": { "literalString": "Reference gs:// URI" },
+              "text": { "path": "/referenceUri" },
+              "textFieldType": "shortText"
+            }
+          }
+        },
+        {
+          "id": "thr",
+          "component": {
+            "Slider": {
+              "label": { "literalString": "Passing threshold (0-1)" },
+              "value": { "path": "/threshold" },
+              "minValue": 0,
+              "maxValue": 1
+            }
+          }
+        },
+        {
+          "id": "ret",
+          "component": {
+            "Slider": {
+              "label": { "literalString": "Max attempts" },
+              "value": { "path": "/maxRetries" },
+              "minValue": 1,
+              "maxValue": 5
+            }
+          }
+        },
+        {
+          "id": "prompt",
+          "component": {
+            "TextField": {
+              "label": { "literalString": "Creative direction (optional)" },
+              "text": { "path": "/userPrompt" },
+              "textFieldType": "longText"
+            }
+          }
+        },
+        {
+          "id": "run-label",
+          "component": { "Text": { "text": { "literalString": "Run evaluation" } } }
+        },
+        {
+          "id": "run",
+          "component": {
+            "Button": {
+              "child": "run-label",
+              "primary": true,
+              "action": {
+                "name": "run_eval",
+                "context": [
+                  { "key": "referenceUri", "value": { "path": "/referenceUri" } },
+                  { "key": "threshold", "value": { "path": "/threshold" } },
+                  { "key": "maxRetries", "value": { "path": "/maxRetries" } },
+                  { "key": "userPrompt", "value": { "path": "/userPrompt" } }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "dataModelUpdate": {
+      "surfaceId": "eval-settings",
+      "path": "/",
+      "contents": [
+        { "key": "referenceUri", "valueString": "gs://my-bucket/products/sneaker.png" },
+        { "key": "threshold", "valueNumber": 0.7 },
+        { "key": "maxRetries", "valueNumber": 3 },
+        { "key": "userPrompt", "valueString": "" }
+      ]
+    }
+  }
+]

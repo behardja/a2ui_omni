@@ -39,12 +39,12 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 logging.getLogger("opentelemetry.context").setLevel(logging.CRITICAL)
 
 A2UI_EXTENSION = {
-    "uri": "https://a2ui.org/a2a-extension/a2ui/v0.9",
+    "uri": "https://a2ui.org/a2a-extension/a2ui/v0.8",
     "description": "Ability to render A2UI",
     "required": False,
     "params": {
         "supportedCatalogIds": [
-            "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"
+            "https://a2ui.org/specification/v0_8/standard_catalog_definition.json"
         ]
     },
 }

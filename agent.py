@@ -15,7 +15,7 @@ from google.genai import types as genai_types
 from a2ui.schema.manager import A2uiSchemaManager
 from a2ui.basic_catalog.provider import BasicCatalog
 from a2ui.schema.common_modifiers import remove_strict_validation
-from a2ui.schema.constants import VERSION_0_9
+from a2ui.schema.constants import VERSION_0_8
 
 logger = logging.getLogger(__name__)
 
@@ -81,49 +81,61 @@ as the reference and proceed with workflow B (or C if they asked to adjust setti
 """
 
 UI_DESCRIPTION = """
-Emit A2UI **v0.9**: an array of messages, each tagged `"version": "v0.9"`, using
-`createSurface` (with a `catalogId` of
-"https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json" AND a
-`"theme": {"primaryColor": "#135bec"}` so widgets match the app's brand color),
-then `updateComponents`, then `updateDataModel`. Components are FLAT objects like
-`{"id","component":"Column","children":["a","b"]}`; the root component's id is
-"root". Bind values with `{"path":"field"}` (relative inside a List item, absolute
-like `/threshold` otherwise). Follow the provided few-shot examples closely.
+Emit A2UI **v0.8**: a BARE JSON ARRAY of messages (no wrapper object, NO
+`version` field), in order `beginRendering` → `surfaceUpdate` → `dataModelUpdate`.
+- `beginRendering`: `{"surfaceId": "...", "catalogId": "https://a2ui.org/specification/v0_8/standard_catalog_definition.json", "root": "root", "styles": {"primaryColor": "#135bec"}}`
+  — ALWAYS include `catalogId` set to exactly that URL (the renderer needs it to
+  load the component catalog), and the `styles` so widgets match the brand color.
+- `surfaceUpdate`: `{"surfaceId": "...", "components": [...]}`. Components are
+  NESTED objects: `{"id": "x", "component": {"<Type>": { ...props }}}` — e.g.
+  `{"id":"root","component":{"Column":{"children":{"explicitList":["a","b"]}}}}`.
+  The root component (id "root") MUST be first; parents before children.
+- Children: multi-child → `"children": {"explicitList": ["id1","id2"]}`;
+  single-child (Card, Button) → `"child": "id"`; repeated list items →
+  `"children": {"template": {"componentId": "item-id", "dataBinding": "/arrayPath"}}`.
+- Every value is an OBJECT: literal → `{"literalString": "..."}` (or
+  `literalNumber`/`literalBoolean`); data-bound → `{"path": "/field"}` (inside a
+  template, paths resolve relative to each array element).
+- `dataModelUpdate`: `{"surfaceId": "...", "path": "/", "contents": [...]}` where
+  each entry is `{"key": "...", "valueString"|"valueNumber"|"valueBoolean": ...}`
+  and arrays/objects use `"valueMap": [ {"key": "...", ...}, ... ]` (an adjacency
+  list; array items are entries like `{"key":"item1","valueMap":[...]}`).
+Follow the provided few-shot examples closely.
 
-- GCS image browser: a `Column` → `List` whose `children` is
-  `{"componentId":"image-card","path":"/images"}`; each item is a `Card`/`Row` with
-  an `Image` (`"url": {"path":"url"}`, `"fit":"cover"`, `"variant":"smallFeature"`),
-  a `Text` name, and a `Button` whose child Text reads **"Generate and Evaluate"**
-  (`"action":{"event":{"name":"select_reference","context":{"referenceUri":{"path":"gs_uri"},"name":{"path":"name"}}}}`).
-  Put the images (name, gs_uri, url) in `updateDataModel` under `/images`.
-- Fidelity results — title it **"Fidelity Report"** (Text variant "h2"), then:
-  * A status `Text` (variant "h3") like "✅ PASS · Score 0.82 · 3 attempts" (use ❌
+- GCS image browser: a `Column` → `List` whose children template is
+  `{"componentId":"image-card","dataBinding":"/images"}`; each item is a `Card`/`Row`
+  with an `Image` (`"url":{"path":"/url"}`, `"fit":"cover"`, `"usageHint":"smallFeature"`),
+  a `Text` name, and a `Button` (child Text reads **"Generate and Evaluate"**) with
+  `"action":{"name":"select_reference","context":[{"key":"referenceUri","value":{"path":"/gs_uri"}},{"key":"name","value":{"path":"/name"}}]}`.
+  Put the images (name, gs_uri, url) in `dataModelUpdate` under key "images".
+- Fidelity results — title it **"Fidelity Report"** (Text usageHint "h2"), then:
+  * A status `Text` (usageHint "h3") like "✅ PASS · Score 0.82 · 3 attempts" (use ❌
     and "FAIL" when not passed; ALWAYS include the number of attempts).
   * A `Row` of two `Card`s: reference `Image` (left) and best-candidate `Image`
     (right, the highest-scoring attempt's candidate_url), each `Image` with
-    `"fit":"contain"` and `"variant":"largeFeature"` (prominent), plus a `Text` caption.
+    `"fit":"contain"` and `"usageHint":"largeFeature"` (prominent), plus a `Text` caption.
   * A `Tabs` component grouping the details:
-    `"tabs":[{"title":"Passing (N)","child":"passing-list"},{"title":"Failing (M)","child":"failing-list"},{"title":"Scores","child":"scores-list"}]`.
-    - passing-list / failing-list: `List` bound to `/passing` / `/failing`; each item
-      is a `Row` of two `Text`s — a mark ("✅" for passing, "❌" for failing) then the
-      verdict bound to `{"path":"text"}`.
-    - scores-list: `List` bound to `/attempts`; each item a `Row` of two `Text`s —
-      the attempt label and its score (format the score as text, e.g. "0.82").
-      (There is NO chart component in v0.9.)
+    `"tabItems":[{"title":{"literalString":"Passing (N)"},"child":"passing-list"},{"title":{"literalString":"Failing (M)"},"child":"failing-list"},{"title":{"literalString":"Scores"},"child":"scores-list"}]`.
+    - passing-list / failing-list: `List` template bound to `/passing` / `/failing`;
+      each item is a `Row` of two `Text`s — a mark ("✅" for passing, "❌" for
+      failing) then the verdict bound to `{"path":"/text"}`.
+    - scores-list: `List` template bound to `/attempts`; each item a `Row` of two
+      `Text`s — the attempt label and its score (format the score as text, e.g.
+      "0.82"). (Do NOT use any chart component.)
 - Evaluation settings panel (a `Card` → `Column`):
-  * `TextField` `"value":{"path":"/referenceUri"}` (the gs:// reference).
-  * `Slider` `"value":{"path":"/threshold"}`, `"min":0`, `"max":1`.
-  * `Slider` `"value":{"path":"/maxRetries"}`, `"min":1`, `"max":5`.
-  * `TextField` `"value":{"path":"/userPrompt"}` for creative direction.
-  * `Button` `"action":{"event":{"name":"run_eval","context":{"referenceUri":{"path":"/referenceUri"},"threshold":{"path":"/threshold"},"maxRetries":{"path":"/maxRetries"},"userPrompt":{"path":"/userPrompt"}}}}`.
-  Pre-fill `updateDataModel` with `get_eval_defaults` values + the referenceUri.
+  * `TextField` `"label":{"literalString":"Reference gs:// URI"}`, `"text":{"path":"/referenceUri"}`.
+  * `Slider` `"label":{"literalString":"Passing threshold (0-1)"}`, `"value":{"path":"/threshold"}`, `"minValue":0`, `"maxValue":1`.
+  * `Slider` `"label":{"literalString":"Max attempts"}`, `"value":{"path":"/maxRetries"}`, `"minValue":1`, `"maxValue":5`.
+  * `TextField` `"label":{"literalString":"Creative direction (optional)"}`, `"text":{"path":"/userPrompt"}`, `"textFieldType":"longText"`.
+  * `Button` `"action":{"name":"run_eval","context":[{"key":"referenceUri","value":{"path":"/referenceUri"}},{"key":"threshold","value":{"path":"/threshold"}},{"key":"maxRetries","value":{"path":"/maxRetries"}},{"key":"userPrompt","value":{"path":"/userPrompt"}}]}`.
+  Pre-fill `dataModelUpdate` with `get_eval_defaults` values + the referenceUri.
 - Image components MUST use the signed `url` fields returned by the tools (not
   gs:// URIs) so they can be displayed.
 - Do NOT put markdown syntax (##, **, -, etc.) inside `Text` values; write plain
-  words only and use the `variant` property ("h2","h3","h4","caption","body") for
-  size/emphasis. (e.g. text "Select a reference image" with variant "h2" — never
-  "## Select a reference image".)
-- Size `Image` with `variant`: grid/browser thumbnails use "smallFeature";
+  words only and use the `usageHint` property ("h2","h3","h4","caption","body")
+  for size/emphasis. (e.g. text "Select a reference image" with usageHint "h2" —
+  never "## Select a reference image".)
+- Size `Image` with `usageHint`: grid/browser thumbnails use "smallFeature";
   reference vs candidate result images use "largeFeature".
 - The fidelity report (scores, pass/fail, verdicts) MUST be rendered as the A2UI
   widgets above — never written out as prose text.
@@ -133,12 +145,20 @@ like `/threshold` otherwise). Follow the provided few-shot examples closely.
 
 
 def create_agent() -> Agent:
+    # The orchestrator model (gemini-3.5-flash) is served ONLY on the global
+    # endpoint — it 404s on regional ones. ADK's genai client reads
+    # GOOGLE_CLOUD_LOCATION at call time, and Agent Engine's runtime overrides
+    # that env var to the engine's region (us-central1), so we must force it
+    # here, in-process, where the platform can't override it. Gecko eval stays
+    # regional via the separate LOCATION var.
+    os.environ["GOOGLE_CLOUD_LOCATION"] = os.environ.get("MODEL_LOCATION", "global")
+
     schema_manager = A2uiSchemaManager(
-        version=VERSION_0_9,
+        version=VERSION_0_8,
         catalogs=[
             BasicCatalog.get_config(
-                version=VERSION_0_9,
-                examples_path=os.path.join(os.path.dirname(__file__), "examples/0.9"),
+                version=VERSION_0_8,
+                examples_path=os.path.join(os.path.dirname(__file__), "examples/0.8"),
             )
         ],
         schema_modifiers=[remove_strict_validation],
@@ -161,7 +181,7 @@ def create_agent() -> Agent:
             "Gecko eval loop, render results as A2UI."
         ),
         # Pass the instruction as a callable (InstructionProvider) so ADK skips
-        # {var} state-injection — the embedded v0.9 A2UI schema contains literal
+        # {var} state-injection — the embedded A2UI schema contains literal
         # braces like `{expression}` that would otherwise raise KeyError.
         instruction=lambda _ctx: instruction,
         # A2UI grids/results embed long signed URLs verbatim; give the model

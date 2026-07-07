@@ -1,0 +1,234 @@
+[
+  {
+    "beginRendering": {
+      "surfaceId": "fidelity-result",
+      "catalogId": "https://a2ui.org/specification/v0_8/standard_catalog_definition.json",
+      "root": "root",
+      "styles": {
+        "primaryColor": "#135bec"
+      }
+    }
+  },
+  {
+    "surfaceUpdate": {
+      "surfaceId": "fidelity-result",
+      "components": [
+        {
+          "id": "root",
+          "component": {
+            "Column": {
+              "children": { "explicitList": ["title", "status", "compare", "verdict-tabs"] },
+              "alignment": "stretch"
+            }
+          }
+        },
+        {
+          "id": "title",
+          "component": {
+            "Text": { "text": { "literalString": "Fidelity Report" }, "usageHint": "h2" }
+          }
+        },
+        {
+          "id": "status",
+          "component": {
+            "Text": { "text": { "literalString": "✅ PASS · Score 0.82 · 2 attempts" }, "usageHint": "h3" }
+          }
+        },
+        {
+          "id": "compare",
+          "component": {
+            "Row": {
+              "children": { "explicitList": ["ref-card", "cand-card"] },
+              "distribution": "center"
+            }
+          }
+        },
+        { "id": "ref-card", "component": { "Card": { "child": "ref-col" } } },
+        {
+          "id": "ref-col",
+          "component": {
+            "Column": {
+              "children": { "explicitList": ["ref-cap", "ref-img"] },
+              "alignment": "center"
+            }
+          }
+        },
+        {
+          "id": "ref-cap",
+          "component": {
+            "Text": { "text": { "literalString": "Reference" }, "usageHint": "caption" }
+          }
+        },
+        {
+          "id": "ref-img",
+          "component": {
+            "Image": {
+              "url": { "literalString": "https://storage.example.com/signed/reference.png" },
+              "fit": "contain",
+              "usageHint": "largeFeature"
+            }
+          }
+        },
+        { "id": "cand-card", "component": { "Card": { "child": "cand-col" } } },
+        {
+          "id": "cand-col",
+          "component": {
+            "Column": {
+              "children": { "explicitList": ["cand-cap", "cand-img"] },
+              "alignment": "center"
+            }
+          }
+        },
+        {
+          "id": "cand-cap",
+          "component": {
+            "Text": { "text": { "literalString": "Best candidate · attempt 2" }, "usageHint": "caption" }
+          }
+        },
+        {
+          "id": "cand-img",
+          "component": {
+            "Image": {
+              "url": { "literalString": "https://storage.example.com/signed/candidate.png" },
+              "fit": "contain",
+              "usageHint": "largeFeature"
+            }
+          }
+        },
+        {
+          "id": "verdict-tabs",
+          "component": {
+            "Tabs": {
+              "tabItems": [
+                { "title": { "literalString": "Passing (2)" }, "child": "passing-list" },
+                { "title": { "literalString": "Failing (1)" }, "child": "failing-list" },
+                { "title": { "literalString": "Scores" }, "child": "scores-list" }
+              ]
+            }
+          }
+        },
+        {
+          "id": "passing-list",
+          "component": {
+            "List": {
+              "direction": "vertical",
+              "children": {
+                "template": { "componentId": "passing-item", "dataBinding": "/passing" }
+              }
+            }
+          }
+        },
+        {
+          "id": "passing-item",
+          "component": {
+            "Row": {
+              "children": { "explicitList": ["passing-mark", "passing-text"] },
+              "alignment": "center"
+            }
+          }
+        },
+        { "id": "passing-mark", "component": { "Text": { "text": { "literalString": "✅" } } } },
+        { "id": "passing-text", "component": { "Text": { "text": { "path": "/text" } } } },
+        {
+          "id": "failing-list",
+          "component": {
+            "List": {
+              "direction": "vertical",
+              "children": {
+                "template": { "componentId": "failing-item", "dataBinding": "/failing" }
+              }
+            }
+          }
+        },
+        {
+          "id": "failing-item",
+          "component": {
+            "Row": {
+              "children": { "explicitList": ["failing-mark", "failing-text"] },
+              "alignment": "center"
+            }
+          }
+        },
+        { "id": "failing-mark", "component": { "Text": { "text": { "literalString": "❌" } } } },
+        { "id": "failing-text", "component": { "Text": { "text": { "path": "/text" } } } },
+        {
+          "id": "scores-list",
+          "component": {
+            "List": {
+              "direction": "vertical",
+              "children": {
+                "template": { "componentId": "score-row", "dataBinding": "/attempts" }
+              }
+            }
+          }
+        },
+        {
+          "id": "score-row",
+          "component": {
+            "Row": {
+              "children": { "explicitList": ["score-label", "score-value"] },
+              "distribution": "spaceBetween"
+            }
+          }
+        },
+        { "id": "score-label", "component": { "Text": { "text": { "path": "/label" } } } },
+        { "id": "score-value", "component": { "Text": { "text": { "path": "/score" }, "usageHint": "h4" } } }
+      ]
+    }
+  },
+  {
+    "dataModelUpdate": {
+      "surfaceId": "fidelity-result",
+      "path": "/",
+      "contents": [
+        {
+          "key": "attempts",
+          "valueMap": [
+            {
+              "key": "attempt1",
+              "valueMap": [
+                { "key": "label", "valueString": "Attempt 1" },
+                { "key": "score", "valueString": "0.61" }
+              ]
+            },
+            {
+              "key": "attempt2",
+              "valueMap": [
+                { "key": "label", "valueString": "Attempt 2" },
+                { "key": "score", "valueString": "0.82" }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "passing",
+          "valueMap": [
+            {
+              "key": "verdict1",
+              "valueMap": [
+                { "key": "text", "valueString": "Product is a white low-top sneaker" }
+              ]
+            },
+            {
+              "key": "verdict2",
+              "valueMap": [
+                { "key": "text", "valueString": "Visible red logo on the heel" }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "failing",
+          "valueMap": [
+            {
+              "key": "verdict1",
+              "valueMap": [
+                { "key": "text", "valueString": "Laces should be flat, not round" }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+]

@@ -1,6 +1,7 @@
 """Deploy the product-fidelity agent to Vertex AI Agent Engine and (optionally)
-register it on Gemini Enterprise (Discovery Engine), injecting the A2UI v0.9
-extension into the agent card. Adapted from the in-workspace invoice-auditor sample.
+register it on Gemini Enterprise (Discovery Engine), injecting the A2UI v0.8
+extension into the agent card (GE's built-in renderer supports A2UI v0.8 only).
+Adapted from the in-workspace invoice-auditor sample.
 
 Prereqs (set in .env):
   PROJECT_ID, LOCATION, STORAGE_BUCKET (gs://), plus the model/bucket vars used
@@ -26,8 +27,8 @@ from vertexai.preview.reasoning_engines.templates.a2a import create_agent_card
 
 from executor import ProductFidelityExecutor
 
-A2UI_EXTENSION_URI = "https://a2ui.org/a2a-extension/a2ui/v0.9"
-A2UI_CATALOG_ID = "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"
+A2UI_EXTENSION_URI = "https://a2ui.org/a2a-extension/a2ui/v0.8"
+A2UI_CATALOG_ID = "https://a2ui.org/specification/v0_8/standard_catalog_definition.json"
 
 
 def _get_bearer_token():
@@ -105,6 +106,17 @@ def main():
     app_id = os.environ.get("GEMINI_ENTERPRISE_APP_ID")
     api_endpoint = f"{location}-aiplatform.googleapis.com"
 
+    # Run the deployed container AS this service account. Default: the project's
+    # Compute Engine default SA, which we grant roles/iam.serviceAccountTokenCreator
+    # (on itself) + storage read so it can mint the V4 signed URLs A2UI Images
+    # need. Without this, Agent Engine runs as a Google-managed service agent that
+    # lacks signBlob, so image URLs come back empty and GE renders nothing.
+    project_number = os.environ.get("PROJECT_NUMBER", "757654702990")
+    service_account = os.environ.get(
+        "RUNTIME_SERVICE_ACCOUNT",
+        f"{project_number}-compute@developer.gserviceaccount.com",
+    )
+
     vertexai.init(project=project_id, location=location,
                   api_endpoint=api_endpoint, staging_bucket=storage)
 
@@ -145,7 +157,7 @@ def main():
         # as a cloudpickle, so the remote runtime has to unpickle it with the same
         # cloudpickle/pydantic/SDK versions or it fails on load.
         "requirements": [
-            "google-cloud-aiplatform[agent_engines,adk]==1.154.0",
+            "google-cloud-aiplatform[agent_engines,adk,evaluation]==1.154.0",
             # google-genai intentionally unpinned: aiplatform[adk] resolves a
             # consistent version (google-adk needs >=2.9); it's a runtime dep,
             # not part of the pickled object graph, so it needn't match local.
@@ -176,7 +188,10 @@ def main():
             "GOOGLE_GENAI_USE_VERTEXAI": "true",
             "PROJECT_ID": project_id,
             "LOCATION": location,
-            "GOOGLE_CLOUD_LOCATION": location,
+            # Model calls must go to the *global* endpoint: gemini-3.x models
+            # (orchestrator gemini-3.5-flash) are not served regionally and 404
+            # in us-central1. LOCATION above stays regional for Gecko eval.
+            "GOOGLE_CLOUD_LOCATION": "global",
             "CANDIDATE_BUCKET": os.environ.get("CANDIDATE_BUCKET", ""),
             "IMAGE_MODEL": os.environ.get("IMAGE_MODEL", "gemini-3.1-flash-image"),
             "GENERATION_LOCATION": os.environ.get("GENERATION_LOCATION", "global"),
@@ -193,7 +208,15 @@ def main():
     from vertexai import agent_engines
 
     _patch_agent_card_serialization()  # 1.154.x pydantic-agent-card workaround
-    remote_agent = agent_engines.create(
+
+    # Upsert by display name: updating an existing engine in place keeps the
+    # SAME resource name, so a Gemini Enterprise registration pointing at it
+    # stays valid across code/env changes.
+    existing = [
+        e for e in agent_engines.list()
+        if (getattr(e, "display_name", "") or "") == config["display_name"]
+    ]
+    common = dict(
         agent_engine=a2ui_agent,
         requirements=config["requirements"],
         display_name=config["display_name"],
@@ -202,11 +225,21 @@ def main():
         extra_packages=config["extra_packages"],
         env_vars=config["env_vars"],
         max_instances=config["max_instances"],
+        service_account=service_account,
     )
-    remote_engine_resource = getattr(remote_agent, "resource_name", None) or (
-        remote_agent.api_resource.name
-    )
-    print(f"✓ Remote agent created: {remote_engine_resource}")
+    print(f"  runtime service account: {service_account}")
+    if existing:
+        remote_agent = agent_engines.update(
+            resource_name=existing[0].resource_name, **common
+        )
+        remote_engine_resource = remote_agent.resource_name
+        print(f"✓ Remote agent UPDATED in place: {remote_engine_resource}")
+    else:
+        remote_agent = agent_engines.create(**common)
+        remote_engine_resource = getattr(remote_agent, "resource_name", None) or (
+            remote_agent.api_resource.name
+        )
+        print(f"✓ Remote agent created: {remote_engine_resource}")
 
     # Gemini Enterprise registration is optional: only run it when an app ID is
     # configured. Without it, we stop after the Agent Engine deployment so you
@@ -222,7 +255,7 @@ def main():
         )
         return
 
-    # Fetch the deployed agent card and inject the A2UI v0.9 extension so any
+    # Fetch the deployed agent card and inject the A2UI v0.8 extension so any
     # consumer (including Gemini Enterprise) knows this agent renders A2UI.
     a2a_endpoint = f"https://{api_endpoint}/v1beta1/{remote_engine_resource}/a2a/v1/card"
     headers = {"Authorization": f"Bearer {_get_bearer_token()}", "Content-Type": "application/json"}
