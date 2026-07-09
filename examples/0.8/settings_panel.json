@@ -19,7 +19,7 @@
           "component": {
             "Column": {
               "children": {
-                "explicitList": ["title", "sub", "ref", "thr", "ret", "prompt", "run"]
+                "explicitList": ["title", "sub", "prompt", "thr", "ret", "ref-caption", "run"]
               },
               "alignment": "stretch"
             }
@@ -28,25 +28,25 @@
         {
           "id": "title",
           "component": {
-            "Text": { "text": { "literalString": "Evaluation settings" }, "usageHint": "h2" }
+            "Text": { "text": { "literalString": "Set up evaluation" }, "usageHint": "h3" }
           }
         },
         {
           "id": "sub",
           "component": {
             "Text": {
-              "text": { "literalString": "Adjust these, then run. Defaults come from the server config." },
+              "text": { "literalString": "Add optional creative direction, then run." },
               "usageHint": "caption"
             }
           }
         },
         {
-          "id": "ref",
+          "id": "prompt",
           "component": {
             "TextField": {
-              "label": { "literalString": "Reference gs:// URI" },
-              "text": { "path": "/referenceUri" },
-              "textFieldType": "shortText"
+              "label": { "literalString": "Creative direction (optional) — e.g. a model wearing the product on a rooftop at sunset" },
+              "text": { "path": "/userPrompt" },
+              "textFieldType": "longText"
             }
           }
         },
@@ -73,13 +73,9 @@
           }
         },
         {
-          "id": "prompt",
+          "id": "ref-caption",
           "component": {
-            "TextField": {
-              "label": { "literalString": "Creative direction (optional)" },
-              "text": { "path": "/userPrompt" },
-              "textFieldType": "longText"
-            }
+            "Text": { "text": { "path": "/referenceLabel" }, "usageHint": "caption" }
           }
         },
         {
@@ -113,6 +109,7 @@
       "path": "/",
       "contents": [
         { "key": "referenceUri", "valueString": "gs://my-bucket/products/sneaker.png" },
+        { "key": "referenceLabel", "valueString": "Reference: gs://my-bucket/products/sneaker.png" },
         { "key": "threshold", "valueNumber": 0.7 },
         { "key": "maxRetries", "valueNumber": 3 },
         { "key": "userPrompt", "valueString": "" }

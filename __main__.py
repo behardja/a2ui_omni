@@ -68,7 +68,7 @@ def build_agent_card(base_url: str) -> AgentCard:
     capabilities = AgentCapabilities(streaming=False, extensions=[A2UI_EXTENSION])
     return AgentCard(
         name="Product Fidelity Agent",
-        description="Evaluates product-image fidelity and renders results as A2UI.",
+        description="Generate new product images with fidelity scoring. Type 'start' to pick or upload a reference image, add optional creative direction, and get a generated image plus a fidelity report.",
         url=base_url,
         version="0.1.0",
         default_input_modes=["text/plain"],

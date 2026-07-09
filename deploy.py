@@ -135,7 +135,7 @@ def main():
     )
     agent_card = create_agent_card(
         agent_name="Product Fidelity Agent",
-        description="Evaluates product-image fidelity and displays interactive A2UI results.",
+        description="Generate new product images with fidelity scoring. Type 'start' to pick or upload a reference image, add optional creative direction, and get a generated image plus a fidelity report.",
         skills=[skill],
         default_input_modes=["text/plain"],
         default_output_modes=["text/plain"],

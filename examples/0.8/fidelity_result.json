@@ -17,7 +17,7 @@
           "id": "root",
           "component": {
             "Column": {
-              "children": { "explicitList": ["title", "status", "compare", "verdict-tabs"] },
+              "children": { "explicitList": ["title", "status", "compare", "passing-head", "passing-list", "failing-head", "failing-list", "scores-head", "scores-list"] },
               "alignment": "stretch"
             }
           }
@@ -96,15 +96,9 @@
           }
         },
         {
-          "id": "verdict-tabs",
+          "id": "passing-head",
           "component": {
-            "Tabs": {
-              "tabItems": [
-                { "title": { "literalString": "Passing (2)" }, "child": "passing-list" },
-                { "title": { "literalString": "Failing (1)" }, "child": "failing-list" },
-                { "title": { "literalString": "Scores" }, "child": "scores-list" }
-              ]
-            }
+            "Text": { "text": { "literalString": "Passing (2)" }, "usageHint": "h4" }
           }
         },
         {
@@ -130,6 +124,12 @@
         { "id": "passing-mark", "component": { "Text": { "text": { "literalString": "✅" } } } },
         { "id": "passing-text", "component": { "Text": { "text": { "path": "/text" } } } },
         {
+          "id": "failing-head",
+          "component": {
+            "Text": { "text": { "literalString": "Failing (1)" }, "usageHint": "h4" }
+          }
+        },
+        {
           "id": "failing-list",
           "component": {
             "List": {
@@ -151,6 +151,12 @@
         },
         { "id": "failing-mark", "component": { "Text": { "text": { "literalString": "❌" } } } },
         { "id": "failing-text", "component": { "Text": { "text": { "path": "/text" } } } },
+        {
+          "id": "scores-head",
+          "component": {
+            "Text": { "text": { "literalString": "Scores" }, "usageHint": "h4" }
+          }
+        },
         {
           "id": "scores-list",
           "component": {

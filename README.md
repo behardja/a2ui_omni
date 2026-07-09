@@ -2,11 +2,13 @@
 
 This repository demonstrates the [product-fidelity-eval](https://github.com/behardja/product-fidelity-eval) framework fronted by **A2UI**, a declarative UI protocol that lets an agent return interactive widgets instead of plain text. A user browses a product reference image from Cloud Storage (or uploads one), optionally adds a line of creative direction, and the agent runs the Gecko fidelity-eval loop and renders the results — reference vs. candidate images, pass/fail status, scores, and rubric verdicts — as A2UI cards the browser draws directly.
 
-The same eval engine as `product-fidelity-eval` (describe → generate → Gecko score → threshold → retry) drives the loop; the difference here is the presentation layer: the agent emits **A2UI v0.8** over **A2A**, matching Gemini Enterprise's built-in renderer (GE currently supports A2UI v0.8 only).
+The same eval engine as `product-fidelity-eval` (describe → generate → Gecko score → threshold → retry) drives the loop; the difference here is the presentation layer: the agent emits **A2UI v0.8** over **A2A**, matching Gemini Enterprise's built-in renderer.
 
-> **Branches:** this branch targets **Gemini Enterprise (A2UI v0.8)** — GE's own renderer draws the UI, and GE currently supports v0.8 only. The **A2UI v0.9** implementation — including the local `dev_client` renderer for visual development — lives on the `v0.9_a2ui` branch, ready for when GE adds v0.9 support at GA. On this v0.8 branch the bundled `dev_client` (a v0.9 renderer) will *not* render the agent's v0.8 output; the render target here is the GE app.
+![Product Fidelity Agent demo](imgs/product_fidelity-agent-1.gif)
 
 ## How it works
+
+![Product Fidelity Agent flow](imgs/product_fidelity_agent_flow.png)
 
 The agent runs one loop per evaluation:
 
@@ -14,7 +16,7 @@ The agent runs one loop per evaluation:
 2. **Generate** — the reference image plus that description plus your optional creative direction are sent to the image model, which recontextualizes the *same* product into a new scene (e.g. "a model posing on a rooftop bar") while keeping the product's design, colors, and pattern intact.
 3. **Evaluate** — Gecko scores the candidate against the description and returns per-attribute passing/failing verdicts.
 4. **Threshold & retry** — if the score is below the passing threshold, the loop retries (up to N attempts), emphasizing the attributes that failed.
-5. **Render** — the agent turns the result into A2UI JSON, which the renderer draws as a "Fidelity Report" card.
+5. **Render** — the agent turns the result into A2UI, which the renderer draws as a "Fidelity Report" card.
 
 ## Models
 
@@ -88,7 +90,6 @@ python server.py
 | `adk_app.py` | `adk web` / Agent Engine entry point |
 | `__main__.py` | agent A2A server (`python -m a2ui_omni`, port 10002) |
 | `deploy.py` | deploy to Agent Engine (runs as compute SA for signed URLs) + register on Gemini Enterprise with the A2UI extension & authorization |
-| `GE_AUTHORIZATION_SETUP.md` | one-time GE OAuth **Authorization Resource** setup (required for GE to invoke the agent) |
 
 ## Deploy to Agent Engine + Gemini Enterprise
 
@@ -103,8 +104,7 @@ above) — the agent will deploy fine without these, but GE won't invoke or rend
   registration must have an `authorizationConfig.agentAuthorization` or GE blocks
   invocation entirely (chat shows "Something went wrong" and no request reaches the
   agent). This means: an OAuth 2.0 client + a Discovery Engine authorization
-  resource, attached to the registration. See **`GE_AUTHORIZATION_SETUP.md`** for
-  the one-time setup.
+  resource, attached to the registration.
 - **Signed-URL permission for images.** The deployed runtime SA must be able to
   mint V4 signed GCS URLs (`roles/iam.serviceAccountTokenCreator` on itself); the
   agent runs as the compute SA for this (`deploy.py` sets `service_account`).

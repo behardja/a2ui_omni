@@ -119,6 +119,55 @@ def _create_a2ui_part(data: dict) -> Part:
     return Part(root=DataPart(data=data, metadata={"mimeType": A2UI_MIME_TYPE}))
 
 
+_V08_CATALOG = "https://a2ui.org/specification/v0_8/standard_catalog_definition.json"
+
+
+def _pop_webframe():
+    """Read + clear the HTML surface (+ chat-side summary) a tool stashed."""
+    try:
+        from . import tools as _t
+    except ImportError:
+        import tools as _t
+    html = getattr(_t, "LAST_WEBFRAME_HTML", None)
+    height = getattr(_t, "LAST_WEBFRAME_HEIGHT", 1000)
+    text = getattr(_t, "LAST_WEBFRAME_TEXT", None)
+    _t.LAST_WEBFRAME_HTML = None
+    _t.LAST_WEBFRAME_TEXT = None
+    return html, height, text
+
+
+def _pop_native():
+    """Read + clear native v0.8 A2UI messages a tool stashed (inline in chat)."""
+    try:
+        from . import tools as _t
+    except ImportError:
+        import tools as _t
+    msgs = getattr(_t, "LAST_NATIVE_A2UI", None)
+    _t.LAST_NATIVE_A2UI = None
+    return msgs
+
+
+def _webframe_parts(html: str, height: int = 1000) -> List[Part]:
+    """Render a server-built HTML surface as an A2UI v0.8 WebFrameSrcdoc.
+
+    Uses the CORRECT v0.8 schema — `htmlContent: {literalString}` + numeric `height`
+    (NOT `srcdoc`/`sandbox`/`style`, which GE ignores → blank). The sandbox CSP is
+    `connect-src 'none'`, which blocks fetch/XHR but NOT <img>/<script>/<style>, so
+    signed-URL images load, inline CSS applies, and inline JS can postMessage
+    actions back to GE. All data is baked in server-side (no client fetch). Matches
+    the working a2ui-seed-agent shape.
+    """
+    msgs = [
+        {"beginRendering": {
+            "surfaceId": "fidelity-surface", "catalogId": _V08_CATALOG,
+            "root": "root", "styles": {"primaryColor": "#135bec"}}},
+        {"surfaceUpdate": {"surfaceId": "fidelity-surface", "components": [
+            {"id": "root", "component": {"WebFrameSrcdoc": {
+                "htmlContent": {"literalString": html}, "height": int(height)}}}]}},
+    ]
+    return [_create_a2ui_part(m) for m in msgs]
+
+
 def parse_response_to_parts(content: str) -> List[Part]:
     matches = list(_A2UI_BLOCK_RE.finditer(content))
     if not matches:
@@ -166,11 +215,49 @@ def _query_from_user_action(action: dict) -> str:
     if isinstance(ctx, list):  # v0.8 context is a list of {key, value}
         ctx = {c.get("key"): c.get("value") for c in ctx if isinstance(c, dict)}
     ctx = {k: _unwrap_value(v) for k, v in ctx.items()}
-    # Both the grid's "select_reference" and the settings panel's "run_eval"
-    # kick off an evaluation and honor optional threshold/max_retries/prompt
-    # (the dev client injects the config-rail values into the action context).
-    if name in ("select_reference", "run_eval"):
-        uri = ctx.get("referenceUri") or ctx.get("gs_uri", "")
+    uri = ctx.get("referenceUri") or ctx.get("gs_uri", "")
+
+    # Entry-screen choices.
+    if name == "choose_gcs":
+        return "Open the GCS image browser by calling list_gcs_images (no arguments)."
+    if name == "choose_upload":
+        return "Open the upload screen by calling open_upload_panel."
+
+    # Web-app "Browse" button (or GCS-path field): (re)list a bucket/prefix.
+    if name == "browse":
+        prefix = ctx.get("prefix") or ctx.get("gcs_prefix") or ""
+        if prefix:
+            return f"List the product images in {prefix} using list_gcs_images."
+        return "List the product images using list_gcs_images (default bucket)."
+
+    # Grid "Configure & Evaluate" (select_reference): DON'T run the eval yet — show
+    # the settings panel so the user can add creative direction + tune the run.
+    # This is how the optional creative-direction field surfaces inside GE (which
+    # has no local shell around the agent).
+    if name == "select_reference":
+        return (
+            f"The user picked reference image {uri}. Call get_eval_defaults, then "
+            f"render the Evaluation settings panel (see UI rules) pre-filled with "
+            f"those defaults and referenceUri='{uri}', so they can optionally enter "
+            f"creative direction and adjust the passing threshold and max attempts. "
+            f"Do NOT run the evaluation yet — wait for the run_eval action."
+        )
+
+    # Settings-panel / web-app "Run evaluation" (run_eval): actually run the eval
+    # with the values the user set (threshold / max_retries / creative direction /
+    # model). If the upload panel sent a base64 image, ingest it to GCS first.
+    if name == "run_eval":
+        upload_data = ctx.get("uploadData")
+        if upload_data and not uri:
+            try:
+                from . import tools as _t
+            except ImportError:
+                import tools as _t
+            try:
+                uri = _t.ingest_base64(upload_data, ctx.get("uploadName", "upload.jpg"))
+            except Exception as e:
+                logger.error("upload ingest failed: %s", e)
+                return "Tell the user the image upload failed; ask them to try a smaller image."
         prompt = ctx.get("userPrompt") or ctx.get("creativeDirection", "")
         threshold = ctx.get("threshold")
         retries = ctx.get("maxRetries") or ctx.get("max_retries")
@@ -293,6 +380,26 @@ class ProductFidelityExecutor(AgentExecutor):
                         if answer_text
                         else [Part(root=TextPart(text="No response generated."))]
                     )
+                    # If a tool produced a server-built HTML surface (the interactive
+                    # browse web-app or the fidelity report), render it as a
+                    # WebFrameSrcdoc (custom CSS + inline JS action bridge) instead of
+                    # the LLM's native widgets. Built server-side → no LLM transcription;
+                    # correct v0.8 `htmlContent` schema so GE renders it.
+                    wf_html, wf_height, wf_text = _pop_webframe()
+                    native_msgs = _pop_native()
+                    if native_msgs:
+                        # Native inline surface (e.g. the entry choice) — renders in
+                        # the chat; its buttons post standard A2UI actions.
+                        parts = [_create_a2ui_part(m) for m in native_msgs]
+                        final_parts = ([Part(root=TextPart(text=wf_text))] if wf_text else []) + parts
+                    elif wf_html:
+                        summary = wf_text or next(
+                            (p.root.text for p in final_parts
+                             if isinstance(getattr(p, "root", None), TextPart) and p.root.text),
+                            "Here you go.",
+                        )
+                        final_parts = [Part(root=TextPart(text=summary))] + \
+                            _webframe_parts(wf_html, wf_height)
                     n_ui = sum(1 for p in final_parts if isinstance(getattr(p, "root", None), DataPart))
                     logger.info(
                         "✔ DONE in %.0fs — sending %d part(s) to the browser (%d A2UI, %d text)",

@@ -25,6 +25,8 @@ try:
         ingest_uploaded_image_tool,
         run_fidelity_eval,
         get_eval_defaults,
+        open_evaluator,
+        open_upload_panel,
     )
 except ImportError:
     from tools import (
@@ -32,6 +34,8 @@ except ImportError:
         ingest_uploaded_image_tool,
         run_fidelity_eval,
         get_eval_defaults,
+        open_evaluator,
+        open_upload_panel,
     )
 
 
@@ -46,38 +50,49 @@ ROLE_DESCRIPTION = (
 WORKFLOW_DESCRIPTION = """
 Choose the workflow based on the user's intent:
 
+ENTRY (do this for a greeting or vague first message): If the user says
+"start"/"hi"/"begin", or sends anything that isn't a specific gs:// path, an
+upload, or a widget action, call `open_evaluator` to show the entry screen where
+they choose "Upload your own" vs "Browse GCS bucket". Do NOT browse or evaluate
+yet. The entry screen's buttons drive the next step:
+  - "choose_gcs" action  → call `list_gcs_images` (no args) to open the browser.
+  - "choose_upload" action → call `open_upload_panel` to open the upload screen.
+
 A. BROWSE GCS IMAGES
-   1. When the user asks to browse/list images in a GCS bucket or prefix, call
-      `list_gcs_images` with their gs:// prefix.
+   1. When the user chooses GCS, asks to browse, or pastes a gs:// prefix, call
+      `list_gcs_images` with their gs:// prefix (or no argument for the default).
    2. Render the returned images as a selectable grid: one Image per item plus a
       Button whose action name is "select_reference" and whose context carries
       the image's `gs_uri` (key "referenceUri") and `name`.
 
-B. EVALUATE A REFERENCE
+B. CONFIGURE THE RUN (settings panel)  ← shown after the user picks an image
+   1. When the user clicks a "select_reference" action (or asks for settings/
+      options), call `get_eval_defaults`, then render the "Evaluation settings"
+      panel (see UI rules) pre-filled with those defaults AND the chosen
+      referenceUri. This panel is where the user enters the optional CREATIVE
+      DIRECTION and tunes the passing threshold and max attempts.
+   2. Do NOT run the evaluation on select_reference — just show this panel and
+      wait for the user to press the panel's "run_eval" button.
+
+C. EVALUATE A REFERENCE
    1. If the user uploaded an image, first call `ingest_uploaded_image_tool` to
       store it and get its gs_uri.
-   2. If the user selected/pasted a gs:// URI, use that directly.
-   3. Call `run_fidelity_eval` with reference_uris=[the gs_uri] (and optional
-      user_prompt, threshold, max_retries, image_model when specified — pass any
-      `image_model` string from the request through verbatim).
-   4. Parse the returned JSON and render the results UI (see UI rules): the
-      reference image, the best candidate image, a score chart across attempts,
-      a pass/fail status, and the passing/failing rubric verdicts.
-
-C. ADJUST SETTINGS BEFORE EVALUATING
-   1. When the user wants to tune the run (or asks for settings/options), first
-      call `get_eval_defaults`, then render the "Evaluation settings" panel
-      (see UI rules) pre-filled with those defaults and the chosen referenceUri.
    2. When the user clicks the "run_eval" action, read referenceUri, threshold,
       maxRetries, and userPrompt from the action context and call
-      `run_fidelity_eval` with them, then render the results UI (workflow B.4).
+      `run_fidelity_eval` with them (pass any `image_model` string verbatim).
+      (If the user explicitly asks to evaluate a pasted gs:// URI directly, you
+      may call `run_fidelity_eval` without the settings panel.)
+   3. Parse the returned JSON and render the results UI (see UI rules): the
+      reference image, the best candidate image, the per-attempt scores, a
+      pass/fail status, and the passing/failing rubric verdicts.
 
 Keep prose to at most ONE short sentence (e.g. "Here are the images." or
 "Evaluation complete."), then emit the A2UI UI block. Do NOT restate scores,
 verdicts, or a written evaluation report in prose — ALL results belong in the
 A2UI widgets (images, score list, verdict lists), not the text.
-When a user clicks a "select_reference" action, treat the provided referenceUri
-as the reference and proceed with workflow B (or C if they asked to adjust settings).
+Flow: browse (grid) → user clicks "Configure & Evaluate" (select_reference) →
+settings panel (creative direction + threshold + attempts) → user clicks
+"Run evaluation" (run_eval) → Fidelity Report.
 """
 
 UI_DESCRIPTION = """
@@ -105,7 +120,7 @@ Follow the provided few-shot examples closely.
 - GCS image browser: a `Column` → `List` whose children template is
   `{"componentId":"image-card","dataBinding":"/images"}`; each item is a `Card`/`Row`
   with an `Image` (`"url":{"path":"/url"}`, `"fit":"cover"`, `"usageHint":"smallFeature"`),
-  a `Text` name, and a `Button` (child Text reads **"Generate and Evaluate"**) with
+  a `Text` name, and a `Button` (child Text reads **"Configure & Evaluate"**) with
   `"action":{"name":"select_reference","context":[{"key":"referenceUri","value":{"path":"/gs_uri"}},{"key":"name","value":{"path":"/name"}}]}`.
   Put the images (name, gs_uri, url) in `dataModelUpdate` under key "images".
 - Fidelity results — title it **"Fidelity Report"** (Text usageHint "h2"), then:
@@ -114,21 +129,28 @@ Follow the provided few-shot examples closely.
   * A `Row` of two `Card`s: reference `Image` (left) and best-candidate `Image`
     (right, the highest-scoring attempt's candidate_url), each `Image` with
     `"fit":"contain"` and `"usageHint":"largeFeature"` (prominent), plus a `Text` caption.
-  * A `Tabs` component grouping the details:
-    `"tabItems":[{"title":{"literalString":"Passing (N)"},"child":"passing-list"},{"title":{"literalString":"Failing (M)"},"child":"failing-list"},{"title":{"literalString":"Scores"},"child":"scores-list"}]`.
-    - passing-list / failing-list: `List` template bound to `/passing` / `/failing`;
-      each item is a `Row` of two `Text`s — a mark ("✅" for passing, "❌" for
-      failing) then the verdict bound to `{"path":"/text"}`.
-    - scores-list: `List` template bound to `/attempts`; each item a `Row` of two
-      `Text`s — the attempt label and its score (format the score as text, e.g.
-      "0.82"). (Do NOT use any chart component.)
-- Evaluation settings panel (a `Card` → `Column`):
-  * `TextField` `"label":{"literalString":"Reference gs:// URI"}`, `"text":{"path":"/referenceUri"}`.
+  * Then three plain SECTIONS stacked in the root Column, each a `Text` heading
+    (usageHint "h4") followed directly by a `List` — do NOT wrap these in a `Tabs`
+    component (GE's renderer does not populate template Lists nested inside Tabs):
+    - "Passing (N)" heading, then a `List` template bound to `/passing`; each item
+      is a `Row` of two `Text`s — "✅" then the verdict bound to `{"path":"/text"}`.
+    - "Failing (M)" heading, then a `List` template bound to `/failing`; each item
+      a `Row` of "❌" then the verdict bound to `{"path":"/text"}`.
+    - "Scores" heading, then a `List` template bound to `/attempts`; each item a
+      `Row` of two `Text`s — the attempt label and its score (format as text, e.g.
+      "0.82"). (Do NOT use any chart or Tabs component.)
+- Evaluation settings panel (a `Card` → `Column`), shown after select_reference so
+  the user can set the CREATIVE DIRECTION and tune the run. Include, in this order:
+  * A `Text` heading (usageHint "h3") "Set up evaluation" and a `Text` (usageHint
+    "caption") "Add optional creative direction, then run."
+  * A prominent `TextField` `"label":{"literalString":"Creative direction (optional) — e.g. a model wearing the product on a rooftop at sunset"}`, `"text":{"path":"/userPrompt"}`, `"textFieldType":"longText"` (put this FIRST among the inputs so it is visible).
   * `Slider` `"label":{"literalString":"Passing threshold (0-1)"}`, `"value":{"path":"/threshold"}`, `"minValue":0`, `"maxValue":1`.
   * `Slider` `"label":{"literalString":"Max attempts"}`, `"value":{"path":"/maxRetries"}`, `"minValue":1`, `"maxValue":5`.
-  * `TextField` `"label":{"literalString":"Creative direction (optional)"}`, `"text":{"path":"/userPrompt"}`, `"textFieldType":"longText"`.
-  * `Button` `"action":{"name":"run_eval","context":[{"key":"referenceUri","value":{"path":"/referenceUri"}},{"key":"threshold","value":{"path":"/threshold"}},{"key":"maxRetries","value":{"path":"/maxRetries"}},{"key":"userPrompt","value":{"path":"/userPrompt"}}]}`.
-  Pre-fill `dataModelUpdate` with `get_eval_defaults` values + the referenceUri.
+  * A read-only `Text` (usageHint "caption") bound to `{"path":"/referenceLabel"}`
+    showing the chosen reference (do NOT ask the user to retype the URI).
+  * `Button` (child Text "Run evaluation") `"action":{"name":"run_eval","context":[{"key":"referenceUri","value":{"path":"/referenceUri"}},{"key":"threshold","value":{"path":"/threshold"}},{"key":"maxRetries","value":{"path":"/maxRetries"}},{"key":"userPrompt","value":{"path":"/userPrompt"}}]}`.
+  Pre-fill `dataModelUpdate` with `get_eval_defaults` values, `referenceUri`,
+  `referenceLabel` = "Reference: " + the referenceUri, and `userPrompt` = "".
 - Image components MUST use the signed `url` fields returned by the tools (not
   gs:// URIs) so they can be displayed.
 - Do NOT put markdown syntax (##, **, -, etc.) inside `Text` values; write plain
@@ -191,6 +213,8 @@ def create_agent() -> Agent:
         ),
         tools=[
             load_artifacts,
+            FunctionTool(open_evaluator),
+            FunctionTool(open_upload_panel),
             FunctionTool(list_gcs_images),
             FunctionTool(ingest_uploaded_image_tool),
             FunctionTool(get_eval_defaults),

@@ -80,7 +80,7 @@
         {
           "id": "select-btn-label",
           "component": {
-            "Text": { "text": { "literalString": "Generate and Evaluate" } }
+            "Text": { "text": { "literalString": "Configure & Evaluate" } }
           }
         },
         {
