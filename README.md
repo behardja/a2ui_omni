@@ -4,7 +4,7 @@ This repository demonstrates the [product-fidelity-eval](https://github.com/beha
 
 The same eval engine as `product-fidelity-eval` (describe → generate → Gecko score → threshold → retry) drives the loop; the difference here is the presentation layer: the agent emits **A2UI v0.8** over **A2A**, matching Gemini Enterprise's built-in renderer.
 
-![Product Fidelity Agent demo](imgs/product_fidelity-agent-1.gif)
+![Product Fidelity Agent demo](imgs/product_fidelity-agent-1.png)
 
 ## How it works
 
