@@ -12,8 +12,8 @@ processor's action handler and are forwarded back as `userAction` data parts.
 ### Recommended: one command (best on a GCP VM)
 
 ```bash
-cd a2ui_omni/dev_client && yarn install && cd ..   # once
-python server.py                                   # from a2ui_omni/
+cd dev_client && yarn install && cd ..   # once, from the repo root
+python server.py                         # from the repo root
 ```
 
 `server.py` starts BOTH the agent (:10002) and this renderer (:5173), binds them
@@ -24,11 +24,11 @@ and no CORS to worry about. Ctrl-C stops both.
 ### Alternative: two terminals (localhost only)
 
 ```bash
-# 1. Start the agent as an A2A server (from the repo root, one dir above a2ui_omni)
-python -m a2ui_omni            # serves on http://localhost:10002
+# 1. Start the agent as an A2A server (from the agent dir, agents/product-fidelity/)
+python -m app                  # serves on http://localhost:10002
 
-# 2. Start this renderer (in a second terminal)
-cd a2ui_omni/dev_client
+# 2. Start this renderer (in a second terminal, from the repo root)
+cd dev_client
 yarn install      # or: npm install
 yarn dev          # opens http://localhost:5173 (still uses the /a2a proxy)
 ```

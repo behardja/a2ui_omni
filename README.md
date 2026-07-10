@@ -1,4 +1,4 @@
-# a2ui_omni — A2UI Product-Fidelity Agent
+# a2ui_product_fidelity — A2UI Product-Fidelity Agent
 
 This repository demonstrates the [product-fidelity-eval](https://github.com/behardja/product-fidelity-eval) framework fronted by **A2UI**, a declarative UI protocol that lets an agent return interactive widgets instead of plain text. A user browses a product reference image from Cloud Storage (or uploads one), optionally adds a line of creative direction, and the agent runs the Gecko fidelity-eval loop and renders the results — reference vs. candidate images, pass/fail status, scores, and rubric verdicts — as A2UI cards the browser draws directly.
 
@@ -60,10 +60,12 @@ cd dev_client && npm install && cd ..
 **3. Run the app:**
 
 ```bash
-python server.py
+python server.py            # from the repo root
 ```
 
 `server.py` is a single launcher: it starts the agent A2A server (uvicorn + Starlette on `:10002`), builds and serves the renderer (Vite on `:5173`), and prints a clickable URL. The renderer proxies the browser's `/a2a` calls to the agent, so the browser only ever talks to one origin — no CORS.
+
+> To run the agent A2A server on its own (without the renderer), start it from the agent package directory: `cd agents/product-fidelity && python -m app`.
 
 **4. Using the app:**
 
@@ -77,19 +79,29 @@ python server.py
 
 ## Layout
 
-| Path | Role |
-|------|------|
-| `server.py` | single launcher: agent A2A server + renderer, prints a clickable URL |
-| `agent.py` | ADK agent; A2UI-aware system prompt (`A2uiSchemaManager` + few-shot `examples/0.8`) |
-| `tools.py` | `list_gcs_images`, `ingest_uploaded_image_tool`, `get_eval_defaults`, `run_fidelity_eval` |
-| `generate.py` | `generate_candidate_image` — the eval loop's generation plugin (recontextualize → GCS) |
-| `executor.py` | A2A bridge: extracts `<a2ui-json>` → A2UI DataParts; maps `select_reference` / `run_eval` actions |
-| `examples/0.8/` | few-shot A2UI exemplars: `gcs_browser`, `fidelity_result`, `settings_panel` |
-| `evaluation_wrapper/` | vendored Gecko loop (`EvalPipeline` / `EvalConfig`) |
-| `dev_client/` | A2UI **v0.9** renderer (built on `@a2ui/lit`) — renders on the `v0.9_a2ui` branch only; GE's own renderer draws the v0.8 output of this branch |
-| `adk_app.py` | `adk web` / Agent Engine entry point |
-| `__main__.py` | agent A2A server (`python -m a2ui_omni`, port 10002) |
-| `deploy.py` | deploy to Agent Engine (runs as compute SA for signed URLs) + register on Gemini Enterprise with the A2UI extension & authorization |
+The agent lives in its own folder — `agents/<name>/app/`, an importable `app` package — following the
+team's agent-ops layout convention: the agent package is self-contained (and is what ships to Agent Engine),
+while shared dev/deploy tooling stays at the repo root. Adding another agent later is just another
+`agents/<name>/` folder.
+
+```
+agents/product-fidelity/app/      # the agent package (shipped to Agent Engine)
+├── agent.py                      # ADK agent; A2UI-aware system prompt (A2uiSchemaManager + few-shot examples/0.8)
+├── tools.py                      # list_gcs_images · ingest_uploaded_image_tool · get_eval_defaults ·
+│                                 #   run_fidelity_eval · open_evaluator · open_upload_panel (+ the HTML/native UI builders)
+├── generate.py                   # generate_candidate_image — the eval loop's generation plugin (recontextualize → GCS)
+├── executor.py                   # A2A bridge: <a2ui-json> / WebFrameSrcdoc → DataParts; maps
+│                                 #   choose_gcs / choose_upload / select_reference / run_eval actions
+├── agent_runtime_app.py          # `adk web` / Agent Engine entry point (exports adk_app)
+├── __main__.py                   # local agent A2A server (run `python -m app`, port 10002)
+├── examples/0.8/                 # few-shot A2UI v0.8 exemplars: gcs_browser, fidelity_result, settings_panel
+└── evaluation_wrapper/           # vendored Gecko loop (EvalPipeline / EvalConfig)
+
+server.py                         # repo root: one-command dev launcher (agent A2A server + renderer)
+deploy.py                         # repo root: deploy to Agent Engine (compute SA for signed URLs) + register on GE
+dev_client/                       # repo root: A2UI v0.9 renderer (@a2ui/lit) — dev preview on the v0.9_a2ui branch;
+                                  #   GE's own renderer draws the v0.8 output of this branch
+```
 
 ## Deploy to Agent Engine + Gemini Enterprise
 
@@ -120,5 +132,5 @@ above) — the agent will deploy fine without these, but GE won't invoke or rend
 
 ## Reference
 
-- [behardja/product-fidelity-eval](https://github.com/behardja/product-fidelity-eval) — the original framework this repository is based on (multi-agent ADK pipeline + React front-end). `a2ui_omni` reuses its evaluation engine and delivers it through an A2UI front-end.
+- [behardja/product-fidelity-eval](https://github.com/behardja/product-fidelity-eval) — the original framework this repository is based on (multi-agent ADK pipeline + React front-end). This agent reuses its evaluation engine and delivers it through an A2UI front-end.
 </content>

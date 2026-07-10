@@ -19,24 +19,14 @@ from a2ui.schema.constants import VERSION_0_8
 
 logger = logging.getLogger(__name__)
 
-try:
-    from .tools import (
-        list_gcs_images,
-        ingest_uploaded_image_tool,
-        run_fidelity_eval,
-        get_eval_defaults,
-        open_evaluator,
-        open_upload_panel,
-    )
-except ImportError:
-    from tools import (
-        list_gcs_images,
-        ingest_uploaded_image_tool,
-        run_fidelity_eval,
-        get_eval_defaults,
-        open_evaluator,
-        open_upload_panel,
-    )
+from app.tools import (
+    list_gcs_images,
+    ingest_uploaded_image_tool,
+    run_fidelity_eval,
+    get_eval_defaults,
+    open_evaluator,
+    open_upload_panel,
+)
 
 
 ROLE_DESCRIPTION = (

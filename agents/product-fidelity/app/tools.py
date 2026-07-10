@@ -259,10 +259,7 @@ def get_eval_defaults() -> str:
     Returns a JSON string: {"threshold", "max_retries", "media_type",
     "description_model", "image_model"}.
     """
-    try:
-        from evaluation_wrapper import EvalConfig
-    except ImportError:
-        from .evaluation_wrapper import EvalConfig  # type: ignore
+    from app.evaluation_wrapper import EvalConfig
     cfg = EvalConfig.from_settings()
     return json.dumps(
         {
@@ -757,14 +754,8 @@ def run_fidelity_eval(
     if not sku_id:
         sku_id = "sku-" + uuid.uuid4().hex[:6]
 
-    try:
-        from evaluation_wrapper import EvalConfig, EvalPipeline
-    except ImportError:
-        from .evaluation_wrapper import EvalConfig, EvalPipeline  # type: ignore
-    try:
-        from generate import generate_candidate_image
-    except ImportError:
-        from .generate import generate_candidate_image  # type: ignore
+    from app.evaluation_wrapper import EvalConfig, EvalPipeline
+    from app.generate import generate_candidate_image
 
     config = EvalConfig.from_settings()
     # Apply per-run overrides from the settings widget (0 = keep default).

@@ -8,11 +8,12 @@ Prereqs (set in .env):
   at runtime. Set GEMINI_ENTERPRISE_APP_ID (and optional AGENT_AUTHORIZATION) to
   also register on Gemini Enterprise; if unset, deployment stops after Agent
   Engine so you can register on GE later.
-Run:  python deploy.py   (from the a2ui_omni/ directory)
+Run:  python deploy.py   (from the repo root)
 """
 
 import json
 import os
+import sys
 
 from a2a.types import AgentSkill
 from dotenv import load_dotenv
@@ -25,7 +26,13 @@ import vertexai
 from vertexai.preview.reasoning_engines import A2aAgent
 from vertexai.preview.reasoning_engines.templates.a2a import create_agent_card
 
-from executor import ProductFidelityExecutor
+# The agent code lives in its own package under agents/<name>/app. Put the agent
+# directory on sys.path so `import app.*` resolves, and ship that whole `app`
+# package to Agent Engine via extra_packages.
+AGENT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "agents", "product-fidelity")
+sys.path.insert(0, AGENT_DIR)
+
+from app.executor import ProductFidelityExecutor
 
 A2UI_EXTENSION_URI = "https://a2ui.org/a2a-extension/a2ui/v0.8"
 A2UI_CATALOG_ID = "https://a2ui.org/specification/v0_8/standard_catalog_definition.json"
@@ -175,14 +182,9 @@ def main():
         ],
         "http_options": {"api_version": "v1beta1"},
         "max_instances": 1,
-        "extra_packages": [
-            "agent.py",
-            "executor.py",
-            "tools.py",
-            "generate.py",
-            "examples",
-            "evaluation_wrapper",
-        ],
+        # Ship the whole agent package (agent/executor/tools/generate + examples +
+        # evaluation_wrapper) as one importable `app` package.
+        "extra_packages": [os.path.join(AGENT_DIR, "app")],
         "env_vars": {
             "NUM_WORKERS": "1",
             "GOOGLE_GENAI_USE_VERTEXAI": "true",

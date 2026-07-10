@@ -36,10 +36,7 @@ from google.adk.memory.in_memory_memory_service import InMemoryMemoryService
 from google.adk.sessions.in_memory_session_service import InMemorySessionService
 from google.genai import types
 
-try:
-    from .agent import get_agent
-except ImportError:
-    from agent import get_agent
+from app.agent import get_agent
 
 logger = logging.getLogger(__name__)
 
@@ -124,10 +121,7 @@ _V08_CATALOG = "https://a2ui.org/specification/v0_8/standard_catalog_definition.
 
 def _pop_webframe():
     """Read + clear the HTML surface (+ chat-side summary) a tool stashed."""
-    try:
-        from . import tools as _t
-    except ImportError:
-        import tools as _t
+    from app import tools as _t
     html = getattr(_t, "LAST_WEBFRAME_HTML", None)
     height = getattr(_t, "LAST_WEBFRAME_HEIGHT", 1000)
     text = getattr(_t, "LAST_WEBFRAME_TEXT", None)
@@ -138,10 +132,7 @@ def _pop_webframe():
 
 def _pop_native():
     """Read + clear native v0.8 A2UI messages a tool stashed (inline in chat)."""
-    try:
-        from . import tools as _t
-    except ImportError:
-        import tools as _t
+    from app import tools as _t
     msgs = getattr(_t, "LAST_NATIVE_A2UI", None)
     _t.LAST_NATIVE_A2UI = None
     return msgs
@@ -249,10 +240,7 @@ def _query_from_user_action(action: dict) -> str:
     if name == "run_eval":
         upload_data = ctx.get("uploadData")
         if upload_data and not uri:
-            try:
-                from . import tools as _t
-            except ImportError:
-                import tools as _t
+            from app import tools as _t
             try:
                 uri = _t.ingest_base64(upload_data, ctx.get("uploadName", "upload.jpg"))
             except Exception as e:

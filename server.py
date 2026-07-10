@@ -1,17 +1,17 @@
-"""a2ui_omni — one-command dev launcher.
+"""product-fidelity — one-command dev launcher.
 
 Starts BOTH local processes with a single command and prints a single URL to
 open from your laptop browser:
 
-  1. The agent A2A server  — `python -m a2ui_omni` (uvicorn + Starlette, :10002),
-     bound to 0.0.0.0 so it's reachable on the VM.
+  1. The agent A2A server  — `python -m app` from agents/product-fidelity/
+     (uvicorn + Starlette, :10002), bound to 0.0.0.0 so it's reachable on the VM.
   2. The dev renderer      — Vite (:5173), bound to 0.0.0.0 (`--host`).
 
 Vite proxies the browser's A2A calls (`/a2a/*`) to the agent on :10002, so the
 browser only ever talks to ONE origin (:5173). That means no CORS is needed for
 this flow, and — on a GCP VM — you open a single external-IP link.
 
-Usage from a2ui_omni/:
+Usage from the repo root:
     python server.py            # no reload
     python server.py --dev      # uvicorn --reload (agent hot-reloads on edits)
 
@@ -30,8 +30,8 @@ import threading
 import time
 import urllib.request
 
-ROOT = os.path.dirname(os.path.abspath(__file__))          # .../a2ui_omni
-PARENT = os.path.dirname(ROOT)                             # .../a2ui-samples (for `-m a2ui_omni`)
+ROOT = os.path.dirname(os.path.abspath(__file__))          # repo root
+AGENT_DIR = os.path.join(ROOT, "agents", "product-fidelity")  # holds the `app` package (for `-m app`)
 DEV_CLIENT = os.path.join(ROOT, "dev_client")
 AGENT_PORT = int(os.environ.get("PORT", 10002))
 VITE_PORT = int(os.environ.get("VITE_PORT", 5173))
@@ -85,7 +85,7 @@ def stream(proc, prefix, color):
 
 
 def _load_dotenv():
-    """Load a2ui_omni/.env into os.environ so the spawned agent + Vite inherit it.
+    """Load the repo-root .env into os.environ so the spawned agent + Vite inherit it.
 
     Uses python-dotenv if present; otherwise a minimal KEY=VALUE fallback so the
     launcher has no hard dependency. Existing env vars are NOT overridden.
@@ -131,9 +131,9 @@ def main():
     agent_proc = None
     vite_proc = None
     try:
-        # ── Start the agent A2A server (python -m a2ui_omni) ──
+        # ── Start the agent A2A server (python -m app, from the agent dir) ──
         agent_cmd = [
-            sys.executable, "-m", "a2ui_omni",
+            sys.executable, "-m", "app",
             "--host", "0.0.0.0", "--port", str(AGENT_PORT),
         ]
         print(f"{BLUE}[agent]{RESET} Starting on :{AGENT_PORT} (uvicorn + Starlette)...")
@@ -141,7 +141,7 @@ def main():
         if args.dev:
             agent_env["UVICORN_RELOAD"] = "1"  # informational; --reload wiring lives in __main__ if added
         agent_proc = subprocess.Popen(
-            agent_cmd, cwd=PARENT, env=agent_env,
+            agent_cmd, cwd=AGENT_DIR, env=agent_env,
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
         )
         threading.Thread(target=stream, args=(agent_proc, "[agent]", BLUE), daemon=True).start()
@@ -176,7 +176,7 @@ def main():
         proxy_host = get_workbench_proxy_url()
         external_ip = get_external_ip()
         print()
-        print(f"  {BOLD}a2ui_omni — dev renderer ready{RESET}")
+        print(f"  {BOLD}product-fidelity — dev renderer ready{RESET}")
         print()
         print(f"  {BOLD}▶ 1. Open one of these in your browser:{RESET}")
         if proxy_host:

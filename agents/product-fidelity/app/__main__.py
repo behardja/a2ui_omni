@@ -2,7 +2,7 @@
 
 Serves the ADK agent over the A2A protocol so a local A2UI renderer (the
 dev_client) can consume and render its A2UI output — the local stand-in for
-Gemini Enterprise. Run:  python -m a2ui_omni   (defaults to port 10002)
+Gemini Enterprise. Run:  python -m app   (from agents/product-fidelity/, defaults to port 10002)
 
 The agent card advertises the A2UI extension so renderers know to treat the
 `application/json+a2ui` DataParts as UI.
@@ -24,10 +24,7 @@ from a2a.types import (
 )
 from starlette.middleware.cors import CORSMiddleware
 
-try:
-    from .executor import ProductFidelityExecutor
-except ImportError:
-    from executor import ProductFidelityExecutor
+from app.executor import ProductFidelityExecutor
 
 logging.basicConfig(level=logging.INFO)
 
