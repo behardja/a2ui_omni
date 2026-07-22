@@ -1,8 +1,8 @@
 # a2ui_product_fidelity — A2UI Product-Fidelity Agent
 
-This repository demonstrates the [product-fidelity-eval](https://github.com/behardja/product-fidelity-eval) framework fronted by **A2UI**, a declarative UI protocol that lets an agent return interactive widgets instead of plain text. A user browses a product reference image from Cloud Storage (or uploads one), optionally adds a line of creative direction, and the agent runs the Gecko fidelity-eval loop and renders the results — reference vs. candidate images, pass/fail status, scores, and rubric verdicts — as A2UI cards the browser draws directly.
+This repository demonstrates the [product-fidelity-eval](https://github.com/behardja/product-fidelity-eval) framework fronted by **A2UI**. A user browses a product reference image from Cloud Storage (or uploads one), optionally adds a line of creative direction, and the agent runs the Gecko fidelity-eval loop and renders the results: reference vs. candidate images, pass/fail status, scores, and rubric verdicts.
 
-The same eval engine as `product-fidelity-eval` (describe → generate → Gecko score → threshold → retry) drives the loop; the difference here is the presentation layer: the agent emits **A2UI v0.8** over **A2A**, matching Gemini Enterprise's built-in renderer.
+The same eval engine as `product-fidelity-eval` (describe → generate → Gecko score → threshold → retry) drives the loop; the added layer is the presentation layer: the agent emits **A2UI v0.8** over **A2A** to integrate with Gemini Enterprise.
 
 ![Product Fidelity Agent demo](imgs/product_fidelity-agent-1.png)
 
@@ -114,21 +114,18 @@ above) — the agent will deploy fine without these, but GE won't invoke or rend
 
 - **A GE Authorization Resource (OAuth) is required.** A "Custom agent via A2A"
   registration must have an `authorizationConfig.agentAuthorization` or GE blocks
-  invocation entirely (chat shows "Something went wrong" and no request reaches the
-  agent). This means: an OAuth 2.0 client + a Discovery Engine authorization
+  invocation entirely. This includes an OAuth 2.0 client + a Discovery Engine authorization
   resource, attached to the registration.
 - **Signed-URL permission for images.** The deployed runtime SA must be able to
   mint V4 signed GCS URLs (`roles/iam.serviceAccountTokenCreator` on itself); the
   agent runs as the compute SA for this (`deploy.py` sets `service_account`).
-- **A2UI version:** GE currently renders **v0.8** only (this branch targets it);
-  see the note at the top.
+- **A2UI version:** GE currently renders **v0.8**
 
 ## Future Work
 
-- Surface the settings panel (creative direction, threshold, attempts) natively in the GE flow, since GE has no local shell.
-- Add video generation/evaluation (Veo), as in `product-fidelity-eval`.
+- Surface the settings panel (creative direction, threshold, attempts) natively in the GE flow
+- Add video generation/evaluation (Omni/Veo), similar to `product-fidelity-eval`.
 - Add a lifecycle rule or cleanup for accumulated candidate images in the GCS bucket.
-- Adopt A2UI v0.9 for GE once GE GA supports it (merge from `v0.9_a2ui`).
 
 ## Reference
 
