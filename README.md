@@ -109,8 +109,7 @@ Set the deployment vars in `.env` and run `python deploy.py` (deploys to Vertex 
 Agent Engine and, when `GEMINI_ENTERPRISE_APP_ID` is set, registers the agent on
 your Gemini Enterprise app).
 
-**Prerequisites for Gemini Enterprise rendering** (beyond the runtime requirements
-above) — the agent will deploy fine without these, but GE won't invoke or render it:
+**Prerequisites for Gemini Enterprise rendering**:
 
 - **A GE Authorization Resource (OAuth) is required.** A "Custom agent via A2A"
   registration must have an `authorizationConfig.agentAuthorization` or GE blocks
